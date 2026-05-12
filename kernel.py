@@ -10,8 +10,6 @@ Logic aligned with:
 https://github.com/confidential-containers/td-shim/blob/main/td-shim-tools/src/bin/td-payload-reference-calculator/main.rs
 """
 
-from __future__ import annotations
-
 import argparse
 import hashlib
 import sys

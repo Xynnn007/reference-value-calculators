@@ -4,7 +4,7 @@
 
 ## 依赖
 
-- **Python 3.10+**
+- **Python 3.7+**（已避免依赖 `from __future__ import annotations`，以便在较旧解释器上运行；推荐使用 **3.10+**。）
 - 仅使用标准库（无需 `pip install`）。
 
 ## 脚本一览

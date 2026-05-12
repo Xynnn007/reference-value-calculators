@@ -6,8 +6,6 @@ Output is exactly ``sha256:<64 lowercase hex>``. Uses the OCI Distribution /
 Docker Registry HTTP V2 API (stdlib only).
 """
 
-from __future__ import annotations
-
 import argparse
 import hashlib
 import json
@@ -18,6 +16,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
 
 # Negotiate like common clients: prefer index / manifest list, then single-arch manifest.
 ACCEPT_MANIFEST = ", ".join(
@@ -115,7 +114,7 @@ def _registry_v2_base(registry: str) -> str:
     return f"{scheme}://{host}/v2/"
 
 
-def _docker_hub_token(repository: str) -> str | None:
+def _docker_hub_token(repository: str) -> Optional[str]:
     q = urllib.parse.urlencode(
         {
             "service": "registry.docker.io",
@@ -142,11 +141,11 @@ def _docker_hub_token(repository: str) -> str | None:
 def _request(
     method: str,
     url: str,
-    headers: dict[str, str],
+    headers: Dict[str, str],
     *,
-    bearer: str | None,
-    data: bytes | None = None,
-) -> tuple[int, dict[str, str], bytes]:
+    bearer: Optional[str],
+    data: Optional[bytes] = None,
+) -> Tuple[int, Dict[str, str], bytes]:
     h = dict(headers)
     if bearer:
         h["Authorization"] = f"Bearer {bearer}"
@@ -162,7 +161,7 @@ def _request(
         return e.code, rh, body
 
 
-def _header_digest(headers: dict[str, str]) -> str | None:
+def _header_digest(headers: Dict[str, str]) -> Optional[str]:
     d = headers.get("docker-content-digest")
     if not d:
         return None
@@ -177,7 +176,9 @@ def _digest_from_body(body: bytes) -> str:
     return f"sha256:{h}"
 
 
-def _www_authenticate_bearer_challenge(headers: dict[str, str]) -> dict[str, str] | None:
+def _www_authenticate_bearer_challenge(
+    headers: Dict[str, str],
+) -> Optional[Dict[str, str]]:
     raw = headers.get("www-authenticate")
     if not raw:
         return None
@@ -185,19 +186,19 @@ def _www_authenticate_bearer_challenge(headers: dict[str, str]) -> dict[str, str
     m = re.match(r"^\s*Bearer\s+(.+)$", raw, re.IGNORECASE)
     if not m:
         return None
-    parts: dict[str, str] = {}
+    parts: Dict[str, str] = {}
     for item in re.finditer(r'(\w+)="([^"]*)"', m.group(1)):
         parts[item.group(1).lower()] = item.group(2)
     return parts
 
 
 def _fetch_bearer_token(
-    registry_host: str, repository: str, challenge: dict[str, str]
-) -> str | None:
+    registry_host: str, repository: str, challenge: Dict[str, str]
+) -> Optional[str]:
     realm = challenge.get("realm")
     if not realm:
         return None
-    qs: dict[str, str] = {}
+    qs: Dict[str, str] = {}
     if "service" in challenge:
         qs["service"] = challenge["service"]
     if "scope" in challenge:
@@ -236,11 +237,11 @@ def resolve_digest(image_ref: str) -> str:
     path_repo = urllib.parse.quote(ref.repository, safe="")
     manifest_url = f"{base}{path_repo}/manifests/{urllib.parse.quote(ref.reference, safe=':')}"
 
-    bearer: str | None = None
+    bearer: Optional[str] = None
     if ref.registry in ("docker.io", "registry-1.docker.io"):
         bearer = _docker_hub_token(ref.repository)
 
-    def do_head(b: str | None) -> tuple[int, dict[str, str], bytes]:
+    def do_head(b: Optional[str]) -> Tuple[int, Dict[str, str], bytes]:
         return _request(
             "HEAD",
             manifest_url,
